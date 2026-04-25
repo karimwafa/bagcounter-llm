@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conveyor Bag Counter</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --background: #f8fafc; --foreground: #0f172a; --card: #ffffff; --card-foreground: #0f172a;
+            --primary: #0f172a; --primary-foreground: #f8fafc; --secondary: #f1f5f9; --secondary-foreground: #1e293b;
+            --muted: #f1f5f9; --muted-foreground: #64748b; --accent: #f1f5f9; --accent-foreground: #0f172a;
+            --destructive: #ef4444; --destructive-foreground: #f8fafc; --border: #e2e8f0; --input: #e2e8f0;
+            --radius: 0.75rem; --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --badge-ok-bg: #dcfce7; --badge-ok-fg: #166534; --badge-ok-border: #bbf7d0;
+        }
+        .dark {
+            --background: #020205; --foreground: #f8fafc; --card: #09090b; --card-foreground: #f8fafc;
+            --primary: #f8fafc; --primary-foreground: #020202; --secondary: #18181b; --secondary-foreground: #f8fafc;
+            --muted: #18181b; --muted-foreground: #a1a1aa; --accent: #18181b; --accent-foreground: #f8fafc;
+            --destructive: #ef4444; --destructive-foreground: #f8fafc; --border: rgba(255, 255, 255, 0.1);
+            --input: rgba(255, 255, 255, 0.1); --shadow-sm: 0 0 0 1px rgba(255,255,255,0.05);
+            --badge-ok-bg: rgba(34, 197, 94, 0.15); --badge-ok-fg: #4ade80; --badge-ok-border: rgba(34, 197, 94, 0.25);
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; background-color: var(--background); color: var(--foreground); font-family: 'Inter', sans-serif; transition: background-color 0.4s ease; }
+        
+        .header { width: 100%; background-color: var(--card); border-bottom: 1px solid var(--border); box-shadow: var(--shadow-sm); position: sticky; top: 0; z-index: 50; }
+        .header-inner { height: 4rem; display: flex; align-items: center; max-width: 1600px; margin: 0 auto; padding: 0 2rem; }
+        .header h1 { font-weight: 700; font-size: 1.25rem; margin: 0; display: flex; align-items: center; gap: 0.75rem; letter-spacing: -0.02em; }
+        .header h1 svg { width: 20px; height: 20px; color: #3b82f6; }
+        .user-nav { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
+        
+        .container { padding: 2rem; max-width: 1600px; margin: 0 auto; display: grid; grid-template-columns: 1fr 320px; gap: 2rem; }
+        .card { background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); overflow: visible; }
+        .card-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); }
+        .card-title { font-weight: 600; font-size: 1rem; margin: 0; }
+        .card-description { font-size: 0.8125rem; color: var(--muted-foreground); margin: 0.25rem 0 0 0; }
+        .card-content { padding: 1.5rem; }
+
+        .video-container { position: relative; background: #000; border-radius: 0.5rem; overflow: hidden; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; }
+        .video-overlay { position: absolute; top: 0; left: 0; padding: 1rem; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.5); font-weight: 600; font-size: 0.875rem; }
+        
+        .hud-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 1.5rem; }
+        .stat-card { background: var(--secondary); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.25rem; }
+        .stat-label { font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; margin-bottom: 0.5rem; }
+        .stat-value { font-size: 1.5rem; font-weight: 700; }
+        .color-in { color: #22c55e; } .color-out { color: #ef4444; }
+
+        .btn { 
+            display: inline-flex; align-items:center; justify-content:center; 
+            height: 2.25rem; padding: 0 1.25rem; border-radius: 0.5rem; 
+            font-size: 0.875rem; font-weight: 600; cursor: pointer; 
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
+            border: none; text-decoration: none; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background: var(--primary); color: var(--primary-foreground); }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--foreground); }
+        .btn-outline:hover { background: var(--secondary); transform: translateY(-1px); }
+        .btn-destructive { background: var(--destructive); color: #fff; }
+        .input { width: 100%; height: 2.25rem; border: 1px solid var(--border); border-radius: 0.5rem; background: var(--secondary); color: var(--foreground); padding: 0 0.75rem; font-size: 0.875rem; }
+
+        /* Custom Dropdown Styling */
+        .dropdown { position: relative; width: 100%; margin-bottom: 0.5rem; }
+        .dropdown-trigger { 
+            width: 100%; height: 2.75rem; background: var(--secondary); border: 1px solid var(--border); 
+            border-radius: 1rem; padding: 0 1rem; display: flex; align-items: center; 
+            justify-content: space-between; font-size: 0.875rem; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .dropdown-trigger:hover { border-color: var(--primary); background: var(--card); transform: translateY(-1px); }
+        .dropdown-trigger::after { 
+            content: ""; width: 0.875rem; height: 0.875rem; 
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") no-repeat center; 
+            background-size: contain; transition: transform 0.3s ease; 
+        }
+        .dropdown.active .dropdown-trigger { border-color: var(--primary); }
+        .dropdown.active .dropdown-trigger::after { transform: rotate(180deg); }
+        .dropdown-menu { 
+            position: absolute; top: calc(100% + 0.5rem); left: 0; width: 100%; background: var(--card); 
+            border: 1px solid var(--border); border-radius: 1.25rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); 
+            display: none; z-index: 50; overflow: hidden; padding: 0.5rem;
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        }
+        .dark .dropdown-menu { background: rgba(9, 9, 11, 0.8); }
+        .dropdown.active .dropdown-menu { display: block; animation: dropFade 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes dropFade { from { opacity: 0; transform: translateY(-10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .dropdown-item { 
+            padding: 0.625rem 0.875rem; border-radius: 0.75rem; font-size: 0.875rem; cursor: pointer; transition: 0.2s; 
+            display: flex; align-items: center; gap: 0.5rem; color: var(--muted-foreground);
+        }
+        .dropdown-item:hover { background: var(--primary); color: var(--primary-foreground); }
+
+        .badge { display: inline-flex; align-items: center; gap: 0.375rem; background: var(--accent); padding: 0.25rem 0.625rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 600; }
+        .badge-live { background: var(--badge-ok-bg); color: var(--badge-ok-fg); border: 1px solid var(--badge-ok-border); }
+        .status-dot { width: 0.375rem; height: 0.375rem; border-radius: 50%; background: currentColor; }
+        .theme-btn { background: none; border: 1px solid var(--border); border-radius: 50%; width: 2.25rem; height: 2.25rem; display: flex; align-items: center; justify-content: center; color: var(--foreground); cursor: pointer; }
+    </style>
+</head>
+<body class="dark">
+    <header class="header">
+        <div class="header-inner">
+            <h1><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> Conveyor Bag Counter</h1>
+            <div id="badgeContainer" style="margin-left: 1rem;">
+                <span class="badge" id="statusBadge"><div class="status-dot"></div> <span id="statusText">Idle</span></span>
+            </div>
+            <div class="user-nav">
+                {% if current_user.role == 'admin' %}
+                <a href="/admin" class="btn btn-primary" style="height: 2.25rem; font-size: 0.8125rem; background: linear-gradient(135deg, #3b82f6, #2563eb); border: none;">🛡️ Admin Dashboard</a>
+                {% endif %}
+                <button class="theme-btn" onclick="toggleTheme()" id="themeIcon"></button>
+                <a href="/logout" class="btn btn-outline" style="height: 2.25rem; font-size: 0.8125rem;">Sign Out</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="main-content">
+            <div class="card">
+                <div class="card-content" style="padding: 1rem;">
+                    <div class="video-container">
+                        <div class="video-overlay" id="videoOverlay">ENGINE STOPPED</div>
+                        <img id="videoFeed" src="" style="width: 100%; height: 100%; object-fit: contain; display: none;">
+                    </div>
+                    <div class="hud-grid">
+                        <div class="stat-card"><div class="stat-label">Total Bags</div><div class="stat-value" id="hudTotal">0</div></div>
+                        <div class="stat-card"><div class="stat-label">Bags In</div><div class="stat-value color-in" id="hudIn">0</div></div>
+                        <div class="stat-card"><div class="stat-label">Bags Out</div><div class="stat-value color-out" id="hudOut">0</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <aside style="display: flex; flex-direction: column; gap: 2rem;">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Properties</h3>
+                    <p class="card-description">Configure the detection engine.</p>
+                </div>
+                <div class="card-content" style="display: flex; flex-direction: column; gap: 1.25rem;">
+                    <div>
+                        <label style="font-size: 0.75rem; font-weight: 600; display: block; margin-bottom: 0.5rem;">Video Source</label>
+                        <div class="dropdown" id="sourceDropdown">
+                            <input type="hidden" id="sourceSelect" value="0">
+                            <div class="dropdown-trigger"><span>Server Cam (0)</span></div>
+                            <div class="dropdown-menu">
+                                <div class="dropdown-item" onclick="selectSource('0', 'Server Cam (0)')">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                    Server Cam (0)
+                                </div>
+                                <div class="dropdown-item" onclick="selectSource('ip', 'IP Camera Stream')">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                                    IP Camera Stream
+                                </div>
+                                <div class="dropdown-item" onclick="selectSource('upload', 'Upload Video File')">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                    Upload Video File
+                                </div>
+                            </div>
+                        </div>
+                        <input type="text" id="videoSource" class="input" placeholder="URL IP Cam..." style="display: none; margin-top: 0.5rem;">
+                        <input type="file" id="videoUpload" class="input" accept="video/mp4,video/avi" style="display: none; padding-top: 0.35rem; margin-top: 0.5rem;">
+                    </div>
+
+                    <div>
+                        <label style="font-size: 0.75rem; font-weight: 600; display: block; margin-bottom: 0.5rem;">AI Model</label>
+                        <div class="dropdown" id="modelDropdown">
+                            <input type="hidden" id="modelSelect" value="yolov8n.pt">
+                            <div class="dropdown-trigger"><span>yolov8n (Nano)</span></div>
+                            <div class="dropdown-menu">
+                                <div class="dropdown-item" onclick="selectModel('yolov8n.pt', 'yolov8n (Nano)')">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m10 8 5 4-5 4V8z"/></svg>
+                                    yolov8n (Nano)
+                                </div>
+                                <div class="dropdown-item" onclick="selectModel('yolov8s.pt', 'yolov8s (Small)')">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                                    yolov8s (Small)
+                                </div>
+                                <div class="dropdown-item" onclick="selectModel('best.pt', 'best.pt (Custom)')">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                                    best.pt (Custom)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem;">
+                        <button class="btn btn-primary" id="startBtn" onclick="startEngine()">Start</button>
+                        <button class="btn btn-destructive" id="stopBtn" onclick="stopEngine()" disabled>Stop</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><h3 class="card-title">System Log</h3></div>
+                <div class="card-content" id="logBox" style="font-family: monospace; font-size: 0.75rem; height: 120px; overflow-y: auto; background: var(--secondary); padding: 0.75rem; border-radius: 0.5rem;">
+                    <div style="color: var(--muted-foreground)">[SYSTEM] Ready to start.</div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <script>
+        // Custom Dropdown Logic
+        document.addEventListener('click', e => {
+            if(!e.target.closest('.dropdown')) document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('active'));
+            else { e.target.closest('.dropdown').classList.toggle('active'); }
+        });
+        function selectSource(val, text) {
+            const d = document.getElementById('sourceDropdown');
+            d.querySelector('input').value = val;
+            d.querySelector('.dropdown-trigger span').innerText = text;
+            toggleSourceInput(val);
+        }
+        function selectModel(val, text) {
+            const d = document.getElementById('modelDropdown');
+            d.querySelector('input').value = val;
+            d.querySelector('.dropdown-trigger span').innerText = text;
+        }
+
+        const svgMoon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
+        const svgSun = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
+        function toggleTheme() {
+            document.body.classList.toggle('dark');
+            localStorage.theme = document.body.classList.contains('dark') ? 'dark' : 'light';
+            document.getElementById('themeIcon').innerHTML = document.body.classList.contains('dark') ? svgSun : svgMoon;
+        }
+        if (localStorage.theme === 'light') document.body.classList.remove('dark');
+        document.getElementById('themeIcon').innerHTML = document.body.classList.contains('dark') ? svgSun : svgMoon;
+
+        function toggleSourceInput(val) {
+            document.getElementById('videoSource').style.display = (val === 'ip') ? 'block' : 'none';
+            document.getElementById('videoUpload').style.display = (val === 'upload') ? 'block' : 'none';
+        }
+
+        function addLog(msg, type='info') {
+            const color = type === 'error' ? '#ef4444' : 'var(--muted-foreground)';
+            const logBox = document.getElementById('logBox');
+            logBox.innerHTML += `<div style="color: ${color}; margin-bottom:0.25rem;">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        async function startEngine() {
+            const srcType = document.getElementById('sourceSelect').value;
+            let finalSrc = srcType;
+            if(srcType === 'ip') finalSrc = document.getElementById('videoSource').value;
+            if(srcType === 'upload') {
+                const file = document.getElementById('videoUpload').files[0];
+                if(!file) return alert("Please select a file first");
+                const formData = new FormData(); formData.append('video', file);
+                addLog('Uploading video file...');
+                const upRes = await fetch('/api/upload', {method: 'POST', body: formData});
+                const upData = await upRes.json();
+                if(upData.ok) finalSrc = upData.path; else return alert("Upload failed");
+            }
+
+            try {
+                const res = await fetch('/api/start', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ source: finalSrc, weights: document.getElementById('modelSelect').value })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    document.getElementById('videoFeed').src = "/video_feed?" + new Date().getTime();
+                    document.getElementById('videoFeed').style.display = 'block';
+                    document.getElementById('videoOverlay').style.display = 'none';
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = false;
+                    document.getElementById('statusBadge').className = 'badge badge-live';
+                    document.getElementById('statusText').innerText = 'LIVE';
+                    addLog('Engine started successfully.');
+                    startStatsPolling();
+                } else {
+                    addLog(data.msg || 'Failed to start engine', 'error');
+                }
+            } catch(e) { addLog('Connection Error', 'error'); }
+        }
+
+        async function stopEngine() {
+            await fetch('/api/stop', {method: 'POST'});
+            document.getElementById('videoFeed').style.display = 'none';
+            document.getElementById('videoOverlay').style.display = 'flex';
+            document.getElementById('videoOverlay').innerText = 'ENGINE STOPPED';
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('statusBadge').className = 'badge';
+            document.getElementById('statusText').innerText = 'Idle';
+            addLog('Engine stopped.');
+            if(statsInterval) clearInterval(statsInterval);
+        }
+
+        let statsInterval = null;
+        function startStatsPolling() {
+            if(statsInterval) clearInterval(statsInterval);
+            statsInterval = setInterval(async () => {
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                document.getElementById('hudTotal').innerText = data.total;
+                document.getElementById('hudIn').innerText = data.in;
+                document.getElementById('hudOut').innerText = data.out;
+            }, 1000);
+        }
+    </script>
+</body>
+</html>

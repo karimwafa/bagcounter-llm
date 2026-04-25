@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Conveyor Bag Counter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --background: #f8fafc; --sidebar: #ffffff; --sidebar-fg: #64748b; --sidebar-active: #0f172a;
+            --foreground: #0f172a; --card: #ffffff; --card-border: #e2e8f0;
+            --primary: #0f172a; --primary-foreground: #f8fafc; --secondary: #f1f5f9;
+            --border: #e2e8f0; --accent: #0f172a; --destructive: #ef4444;
+            --radius: 0.75rem; --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .dark {
+            --background: #020205; --sidebar: #09090b; --sidebar-fg: #a1a1aa; --sidebar-active: #ffffff;
+            --foreground: #ffffff; --card: #09090b; --card-border: rgba(255,255,255,0.1);
+            --primary: #ffffff; --primary-foreground: #000000; --secondary: #18181b;
+            --border: rgba(255,255,255,0.1); --accent: #fafafa;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; background-color: var(--background); color: var(--foreground); font-family: 'Inter', sans-serif; display: flex; min-height: 100vh; overflow: hidden; transition: 0.3s; }
+        
+        .sidebar { width: 280px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+        .sidebar-header { padding: 2rem 1.5rem; display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid var(--border); }
+        .sidebar-nav { padding: 1.5rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; flex: 1; }
+        .nav-item { display: flex; align-items: center; padding: 0.75rem 1rem; border-radius: 0.5rem; color: var(--sidebar-fg); text-decoration: none; font-weight: 500; font-size: 0.875rem; transition: 0.2s; cursor: pointer; gap: 0.75rem; }
+        .nav-item:hover { background: var(--secondary); color: var(--foreground); }
+        .nav-item.active { background: var(--secondary); color: var(--sidebar-active); font-weight: 600; }
+        .sidebar-footer { padding: 1rem; border-top: 1px solid var(--border); display: flex; gap: 0.5rem; }
+
+        .main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+        .top-bar { height: 4rem; border-bottom: 1px solid var(--border); background: var(--card); display: flex; align-items: center; padding: 0 2rem; position: sticky; top: 0; z-index: 10; }
+        .view-container { padding: 2rem; max-width: 1200px; margin: 0 auto; width: 100%; display: none; }
+        .view-container.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .stat-card { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow); }
+        .stat-label { font-size: 0.75rem; font-weight: 600; color: var(--sidebar-fg); text-transform: uppercase; margin-bottom: 0.5rem; }
+        .stat-value { font-size: 1.875rem; font-weight: 700; }
+        
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: visible; }
+        .card-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .card-title { font-weight: 600; font-size: 1.1rem; margin: 0; }
+        .card-content { padding: 1.5rem; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        th { text-align: left; padding: 1rem; border-bottom: 1px solid var(--border); color: var(--sidebar-fg); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; }
+        td { padding: 1rem; border-bottom: 1px solid var(--border); }
+        
+        .btn { display: inline-flex; align-items: center; justify-content: center; height: 2.25rem; padding: 0 1.25rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: 0.2s; border: none; text-decoration: none; gap: 0.5rem; text-align: center; }
+        .btn-primary { background: var(--primary); color: var(--primary-foreground); }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--foreground); }
+        .btn-outline:hover { background: var(--secondary); transform: translateY(-1px); }
+        .btn-destructive { background: var(--destructive); color: #fff; }
+        .input { width: 100%; height: 2.5rem; border: 1px solid var(--border); border-radius: 0.5rem; background: var(--secondary); color: var(--foreground); padding: 0 0.875rem; margin-bottom: 1rem; font-size: 0.875rem; transition: all 0.2s; }
+        .input:focus { outline: none; border-color: var(--foreground); box-shadow: 0 0 0 2px rgba(0,0,0,0.05); }
+
+        /* Custom Dropdown Styling */
+        .dropdown { position: relative; width: 100%; margin-bottom: 1rem; }
+        .dropdown-trigger { 
+            width: 100%; height: 2.75rem; background: var(--secondary); border: 1px solid var(--border); 
+            border-radius: 1rem; padding: 0 1rem; display: flex; align-items: center; 
+            justify-content: space-between; font-size: 0.875rem; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow);
+        }
+        .dropdown-trigger:hover { border-color: var(--primary); background: var(--card); transform: translateY(-1px); }
+        .dropdown-trigger::after { 
+            content: ""; width: 1rem; height: 1rem; 
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") no-repeat center; 
+            background-size: contain; transition: transform 0.3s ease; 
+        }
+        .dropdown.active .dropdown-trigger { border-color: var(--primary); }
+        .dropdown.active .dropdown-trigger::after { transform: rotate(180deg); }
+        .dropdown-menu { 
+            position: absolute; top: calc(100% + 0.5rem); left: 0; width: 100%; background: var(--card); 
+            border: 1px solid var(--border); border-radius: 1.25rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); 
+            display: none; z-index: 50; overflow: hidden; padding: 0.5rem;
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        }
+        .dark .dropdown-menu { background: rgba(9, 9, 11, 0.8); }
+        .dropdown.active .dropdown-menu { display: block; animation: dropFade 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes dropFade { from { opacity: 0; transform: translateY(-10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .dropdown-item { 
+            padding: 0.75rem 1rem; border-radius: 0.75rem; font-size: 0.875rem; cursor: pointer; transition: 0.2s; 
+            display: flex; align-items: center; gap: 0.5rem; color: var(--sidebar-fg);
+        }
+        .dropdown-item:hover { background: var(--primary); color: var(--primary-foreground); }
+
+        .theme-btn { background: none; border: 1px solid var(--border); border-radius: 50%; width: 2.25rem; height: 2.25rem; display: flex; align-items: center; justify-content: center; color: var(--foreground); cursor: pointer; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal.active { display: flex; }
+        .modal-content { background: var(--card); width: 100%; max-width: 400px; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); overflow: visible; }
+    </style>
+</head>
+<body class="dark">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+            <span style="font-weight: 700; font-size: 1.1rem; letter-spacing: -0.02em;">Admin System</span>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-item active" onclick="switchView('overview')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                Dashboard Admin
+            </div>
+            <div class="nav-item" onclick="switchView('history')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+                Detail Data
+            </div>
+            <div class="nav-item" onclick="switchView('users')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                User Management
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="theme-btn" onclick="toggleTheme()" id="themeIcon"></button>
+            <a href="/logout" class="btn btn-outline" style="flex: 1; font-size: 0.75rem;">Sign Out</a>
+        </div>
+    </aside>
+
+    <main class="main">
+        <header class="top-bar">
+            <h2 id="viewTitle" style="font-weight: 600; font-size: 1rem; margin: 0;">Dashboard Admin</h2>
+            <div style="margin-left: auto;">
+                <a href="/" class="btn btn-outline" style="height: 2rem; font-size: 0.75rem;">← Back to Operator</a>
+            </div>
+        </header>
+
+        <div id="view-overview" class="view-container active">
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-label">All Time</div><div class="stat-value" id="totAll">0</div></div>
+                <div class="stat-card"><div class="stat-label">Today</div><div class="stat-value" id="totDay">0</div></div>
+                <div class="stat-card"><div class="stat-label">Weekly</div><div class="stat-value" id="totWeek">0</div></div>
+                <div class="stat-card"><div class="stat-label">Monthly</div><div class="stat-value" id="totMonth">0</div></div>
+            </div>
+            <div class="card">
+                <div class="card-header"><h3 class="card-title">Grafik Harian - Hari Ini</h3></div>
+                <div class="card-content"><canvas id="dailyChart" height="100"></canvas></div>
+            </div>
+        </div>
+
+        <div id="view-history" class="view-container">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Historical Scan Data</h3>
+                    <a href="/api/admin/export" class="btn btn-primary">Export CSV</a>
+                </div>
+                
+                <div class="card-content" style="border-bottom: 1px solid var(--border); background: var(--secondary); display: flex; gap: 1rem; align-items: center; padding: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 0.75rem; font-weight: 600; color: var(--sidebar-fg);">FROM</span>
+                        <input type="date" id="historyStart" class="input" style="margin-bottom:0; height: 2rem; width: 140px;">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 0.75rem; font-weight: 600; color: var(--sidebar-fg);">TO</span>
+                        <input type="date" id="historyEnd" class="input" style="margin-bottom:0; height: 2rem; width: 140px;">
+                    </div>
+                    <button class="btn btn-primary" onclick="fetchHistory()" style="height: 2rem; font-size: 0.75rem;">Apply Filter</button>
+                    <div id="historySummary" style="margin-left: auto; font-size: 0.8rem; font-weight: 600; display: flex; gap: 1rem;">
+                        <span>Total: <b id="histSumTotal">0</b></span>
+                        <span style="color:#22c55e">In: <b id="histSumIn">0</b></span>
+                        <span style="color:#ef4444">Out: <b id="histSumOut">0</b></span>
+                    </div>
+                </div>
+
+                <div class="card-content" style="padding: 0; max-height: calc(100vh - 20rem); overflow-y: auto;">
+                    <table>
+                        <thead><tr><th>Timestamp</th><th>Source</th><th>Total</th><th>In</th><th>Out</th></tr></thead>
+                        <tbody id="historyBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="card-footer" style="padding: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--card);">
+                    <div style="font-size: 0.75rem; color: var(--sidebar-fg);">
+                        Showing <span id="pageStart">0</span> - <span id="pageEnd">0</span> of <span id="pageTotal">0</span> entries
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-outline" id="prevPage" onclick="changePage(-1)" style="height: 2rem; font-size: 0.75rem;">Previous</button>
+                        <button class="btn btn-outline" id="nextPage" onclick="changePage(1)" style="height: 2rem; font-size: 0.75rem;">Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-users" class="view-container">
+            <div style="display: grid; grid-template-columns: 1fr 340px; gap: 2rem;">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">System Users</h3></div>
+                    <div class="card-content" id="userList"></div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">Register User</h3></div>
+                    <div class="card-content">
+                        <input type="text" id="newUsername" class="input" placeholder="Username">
+                        <input type="password" id="newPassword" class="input" placeholder="Password">
+                        
+                        <div class="dropdown" id="roleRegDropdown">
+                            <input type="hidden" id="newRole" value="operator">
+                            <div class="dropdown-trigger"><span>Operator</span></div>
+                            <div class="dropdown-menu">
+                                <div class="dropdown-item" onclick="selectDrop('roleRegDropdown', 'operator', 'Operator')">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                                    Operator
+                                </div>
+                                <div class="dropdown-item" onclick="selectDrop('roleRegDropdown', 'admin', 'Admin')">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                    Admin
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" onclick="addUser()" style="width: 100%;">Create New Account</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="card-header"><h3 class="card-title">Edit Account</h3></div>
+            <div class="card-content">
+                <input type="hidden" id="editUid">
+                <label style="font-size: 0.75rem; font-weight: 600;">Username</label>
+                <input type="text" id="editUsername" class="input" disabled>
+                <label style="font-size: 0.75rem; font-weight: 600;">New Password (empty to keep)</label>
+                <input type="password" id="editPassword" class="input">
+                <label style="font-size: 0.75rem; font-weight: 600;">Role</label>
+                
+                <div class="dropdown" id="roleEditDropdown">
+                    <input type="hidden" id="editRole" value="operator">
+                    <div class="dropdown-trigger"><span>Operator</span></div>
+                    <div class="dropdown-menu">
+                        <div class="dropdown-item" onclick="selectDrop('roleEditDropdown', 'operator', 'Operator')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                            Operator
+                        </div>
+                        <div class="dropdown-item" onclick="selectDrop('roleEditDropdown', 'admin', 'Admin')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            Admin
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                    <button class="btn btn-outline" style="flex: 1;" onclick="closeEdit()">Cancel</button>
+                    <button class="btn btn-primary" style="flex: 2;" onclick="saveEdit()">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const svgMoon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
+        const svgSun = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
+        function toggleTheme() {
+            document.body.classList.toggle('dark');
+            localStorage.theme = document.body.classList.contains('dark') ? 'dark' : 'light';
+            document.getElementById('themeIcon').innerHTML = document.body.classList.contains('dark') ? svgSun : svgMoon;
+        }
+        if (localStorage.theme === 'light') document.body.classList.remove('dark');
+        document.getElementById('themeIcon').innerHTML = document.body.classList.contains('dark') ? svgSun : svgMoon;
+
+        // Custom Dropdown Logic
+        document.addEventListener('click', e => {
+            if(!e.target.closest('.dropdown')) document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('active'));
+            else {
+                const drop = e.target.closest('.dropdown');
+                if(e.target.closest('.dropdown-trigger')) drop.classList.toggle('active');
+            }
+        });
+        function selectDrop(id, val, text) {
+            const drop = document.getElementById(id);
+            drop.querySelector('input').value = val;
+            drop.querySelector('.dropdown-trigger span').innerText = text;
+            drop.classList.remove('active');
+        }
+
+        function switchView(view) {
+            document.querySelectorAll('.view-container, .nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById(`view-${view}`).classList.add('active');
+            event.currentTarget.classList.add('active');
+            document.getElementById('viewTitle').innerText = event.currentTarget.innerText;
+            if(view==='overview') loadDashboard();
+            if(view==='history') fetchHistory();
+            if(view==='users') fetchUsers();
+        }
+
+        let chart = null;
+        async function loadDashboard() {
+            const res = await fetch('/api/admin/stats');
+            const data = await res.json();
+            document.getElementById('totAll').innerText = data.total;
+            document.getElementById('totDay').innerText = data.daily;
+            document.getElementById('totWeek').innerText = data.weekly;
+            document.getElementById('totMonth').innerText = data.monthly;
+
+            const cres = await fetch('/api/admin/chart-data');
+            const cdata = await cres.json();
+            if(chart) chart.destroy();
+            const ctx = document.getElementById('dailyChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: cdata.labels, datasets: [{ label: 'Total Bags', data: cdata.data, backgroundColor: '#3b82f6', borderRadius: 4 }] },
+                options: { responsive: true, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } }
+            });
+        }
+
+        let historyPage = 1;
+        function changePage(delta) {
+            historyPage += delta;
+            fetchHistory(historyPage);
+        }
+
+        async function fetchHistory(page = 1) {
+            historyPage = page;
+            const start = document.getElementById('historyStart').value;
+            const end = document.getElementById('historyEnd').value;
+            const url = `/api/history?start=${start}&end=${end}&page=${page}&per_page=10`;
+            const res = await fetch(url);
+            const result = await res.json();
+            const data = result.data;
+            document.getElementById('historyBody').innerHTML = data.map(h => `<tr><td>${h.start}</td><td>${h.source}</td><td><b>${h.total}</b></td><td style="color:#22c55e">${h.in}</td><td style="color:#ef4444">${h.out}</td></tr>`).join('');
+            
+            document.getElementById('histSumTotal').innerText = result.summary.total;
+            document.getElementById('histSumIn').innerText = result.summary.in;
+            document.getElementById('histSumOut').innerText = result.summary.out;
+
+            // Pagination UI
+            const total = result.total_items;
+            const pages = result.pages;
+            document.getElementById('pageTotal').innerText = total;
+            document.getElementById('pageStart').innerText = Math.min((page - 1) * 10 + 1, total);
+            document.getElementById('pageEnd').innerText = Math.min(page * 10, total);
+            
+            document.getElementById('prevPage').disabled = (page <= 1);
+            document.getElementById('nextPage').disabled = (page >= pages);
+        }
+
+        function setDefaultDates() {
+            const end = new Date();
+            const start = new Date();
+            start.setDate(end.getDate() - 10);
+            document.getElementById('historyEnd').valueAsDate = end;
+            document.getElementById('historyStart').valueAsDate = start;
+        }
+        setDefaultDates();
+
+        async function fetchUsers() {
+            const res = await fetch('/api/users');
+            const data = await res.json();
+            document.getElementById('userList').innerHTML = data.map(u => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid var(--border);">
+                    <span><b>${u.username}</b> <span style="font-size:0.8rem; color:var(--sidebar-fg)">(${u.role})</span></span>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="btn btn-outline" style="height:1.75rem; padding:0 0.75rem; font-size:0.7rem;" onclick='openEdit(${JSON.stringify(u)})'>Edit</button>
+                        ${u.username !== 'admin' ? `<button class="btn btn-destructive" style="height:1.75rem; padding:0 0.75rem; font-size:0.7rem;" onclick="deleteUser(${u.id})">Remove</button>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openEdit(user) {
+            document.getElementById('editUid').value = user.id;
+            document.getElementById('editUsername').value = user.username;
+            selectDrop('roleEditDropdown', user.role, user.role.charAt(0).toUpperCase() + user.role.slice(1));
+            document.getElementById('roleEditDropdown').style.opacity = (user.username === 'admin') ? '0.5' : '1';
+            document.getElementById('roleEditDropdown').style.pointerEvents = (user.username === 'admin') ? 'none' : 'auto';
+            document.getElementById('editModal').classList.add('active');
+        }
+        function closeEdit() { document.getElementById('editModal').classList.remove('active'); }
+        async function saveEdit() {
+            const uid = document.getElementById('editUid').value;
+            const res = await fetch('/api/users/'+uid, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ password: document.getElementById('editPassword').value, role: document.getElementById('editRole').value }) });
+            if((await res.json()).ok) { closeEdit(); fetchUsers(); }
+        }
+
+        async function addUser() {
+            const res = await fetch('/api/users', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ username: document.getElementById('newUsername').value, password: document.getElementById('newPassword').value, role: document.getElementById('newRole').value }) });
+            if((await res.json()).ok) { fetchUsers(); document.getElementById('newUsername').value=''; document.getElementById('newPassword').value=''; }
+        }
+        async function deleteUser(id) { if(confirm("Delete account?")) { await fetch('/api/users/'+id, {method:'DELETE'}); fetchUsers(); } }
+
+        loadDashboard();
+    </script>
+</body>
+</html>
